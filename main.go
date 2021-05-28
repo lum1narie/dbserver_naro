@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -31,7 +32,7 @@ func main() {
 
 	fmt.Println("Connected!")
 	var city City
-	if err := db.Get(&city, "select * from city where name = 'Tokyo'"); err == sql.ErrNoRows {
+	if err := db.Get(&city, "select * from city where name = 'Tokyo'"); errors.Is(err, sql.ErrNoRows) {
 		log.Println("no such city Name=%s", "Tokyo")
 	} else if err != nil {
 		log.Fatalf("DB Error: %s", err)
