@@ -20,6 +20,12 @@ type City struct {
 }
 
 func main() {
+	target_city := "Tokyo"
+
+	if len(os.Args) >= 2 {
+		target_city = os.Args[1]
+	}
+
 	db, err := sqlx.Connect("mysql", fmt.Sprintf(
 		"%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local",
 		os.Getenv("DB_USERNAME"), os.Getenv("DB_PASSWORD"),
@@ -32,11 +38,11 @@ func main() {
 
 	fmt.Println("Connected!")
 	var city City
-	if err := db.Get(&city, "select * from city where name = 'Tokyo'"); errors.Is(err, sql.ErrNoRows) {
-		log.Println("no such city Name=%s", "Tokyo")
+	if err := db.Get(&city, "select * from city where name = ?", target_city); errors.Is(err, sql.ErrNoRows) {
+		log.Printf("no such city Name %s\n", target_city)
 	} else if err != nil {
 		log.Fatalf("DB Error: %s", err)
 	}
 
-	fmt.Printf("Tokyoの人口は%d人です\n", city.Population)
+	fmt.Printf("%sの人口は%d人です\n", target_city, city.Population)
 }
