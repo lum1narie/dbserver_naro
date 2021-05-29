@@ -109,7 +109,8 @@ func postSignUpHandler(c echo.Context) error {
 	}
 
 	addUserQuery := "insert into users (Username, HashedPass) values(?, ?)"
-	if _, queryErr := db.Exec(addUserQuery, req.Username, hashedPass); queryErr != nil {
+	if _, queryErr := db.Exec(
+		addUserQuery, req.Username, hashedPass); queryErr != nil {
 		return c.String(http.StatusInternalServerError,
 			fmt.Sprintf("db error: %v", queryErr))
 	}
@@ -142,7 +143,8 @@ func postLoginHandler(c echo.Context) error {
 	sess, sessErr := session.Get("sessions", c)
 	if sessErr != nil {
 		fmt.Println(sessErr)
-		return c.String(http.StatusInternalServerError, "something wrong in getting session")
+		return c.String(http.StatusInternalServerError,
+			"something wrong in getting session")
 	}
 	sess.Values["userName"] = req.Username
 	sess.Save(c.Request(), c.Response())
@@ -155,7 +157,8 @@ func checkLogin(next echo.HandlerFunc) echo.HandlerFunc {
 		sess, err := session.Get("sessions", c)
 		if err != nil {
 			fmt.Println(err)
-			return c.String(http.StatusInternalServerError, "something wrong in getting session")
+			return c.String(http.StatusInternalServerError,
+				"something wrong in getting session")
 		}
 
 		if sess.Values["userName"] == nil {
@@ -186,7 +189,8 @@ func getCountryNamePop(code string) CountryNamePop {
 	var countryNamePop CountryNamePop
 
 	query := "select Code, Name, Population from country where code = ?"
-	if err := db.Get(&countryNamePop, query, code); errors.Is(err, sql.ErrNoRows) {
+	if err := db.Get(
+		&countryNamePop, query, code); errors.Is(err, sql.ErrNoRows) {
 		log.Printf("no such country Code %s\n", code)
 	} else if err != nil {
 		log.Fatalf("DB Error: %s", err)
@@ -204,7 +208,8 @@ func getCityPopulationHandler(c echo.Context) error {
 	countryNamePop := getCountryNamePop(city.CountryCode)
 
 	ratio := float64(city.Population) / float64(countryNamePop.Population)
-	fmt.Printf("%sの人口は%sの人口の%f%%です\n", target_city, countryNamePop.Name, ratio*100.0)
+	fmt.Printf("%sの人口は%sの人口の%f%%です\n",
+		target_city, countryNamePop.Name, ratio*100.0)
 	return c.JSON(http.StatusOK, CityPopulationResponse{
 		Name:       target_city,
 		Population: city.Population,
@@ -220,7 +225,8 @@ func getCityInfoHandler(c echo.Context) error {
 		if errors.Is(err, sql.ErrNoRows) {
 			return c.String(http.StatusBadRequest, "no city found")
 		} else {
-			return c.String(http.StatusInternalServerError, "something went wrong")
+			return c.String(http.StatusInternalServerError,
+				"something went wrong")
 		}
 	}
 
@@ -246,6 +252,11 @@ values
 	return c.String(http.StatusOK, "")
 }
 
+func getWhoAmIHandler(c echo.Context) error {
+	userName := c.Get("userName").(string)
+	return c.String(http.StatusOK, userName)
+}
+
 func main() {
 	db = initDB()
 	store := initSession()
@@ -264,6 +275,7 @@ func main() {
 	withLogin.Use(checkLogin)
 
 	withLogin.GET("/cities/:cityName", getCityInfoHandler)
+	withLogin.GET("/whoami", getWhoAmIHandler)
 
 	e.Start(":10101")
 }
