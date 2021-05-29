@@ -20,9 +20,9 @@ var (
 
 type (
 	City struct {
-		ID          int    `json:"id,omitempty" db:"ID"`
-		Name        string `json:"name,omitempty" db:"Name"`
-		CountryCode string `json:"countryCode,omitempty" db:"CountryCode"`
+		ID          int    `json:"id" db:"ID"`
+		Name        string `json:"name" db:"Name"`
+		CountryCode string `json:"countryCode" db:"CountryCode"`
 		District    string `json:"district,omitempty" db:"District"`
 		Population  int    `json:"population,omitempty" db:"Population"`
 	}
@@ -57,7 +57,9 @@ func initDB() {
 
 func getCity(name string) City {
 	var city City
-	if err := db.Get(&city, "select * from city where name = ?", name); errors.Is(err, sql.ErrNoRows) {
+
+	query := "select * from city where name = ?"
+	if err := db.Get(&city, query, name); errors.Is(err, sql.ErrNoRows) {
 		log.Printf("no such city Name %s\n", name)
 	} else if err != nil {
 		log.Fatalf("DB Error: %s", err)
@@ -68,7 +70,9 @@ func getCity(name string) City {
 
 func getCountryNamePop(code string) CountryNamePop {
 	var countryNamePop CountryNamePop
-	if err := db.Get(&countryNamePop, "select Code, Name, Population from country where code = ?", code); errors.Is(err, sql.ErrNoRows) {
+
+	query := "select Code, Name, Population from country where code = ?"
+	if err := db.Get(&countryNamePop, query, code); errors.Is(err, sql.ErrNoRows) {
 		log.Printf("no such country Code %s\n", code)
 	} else if err != nil {
 		log.Fatalf("DB Error: %s", err)
@@ -101,6 +105,23 @@ func getCityInfoHandler(c echo.Context) error {
 	return c.JSON(http.StatusOK, city)
 }
 
+func postCityHandler(c echo.Context) error {
+	new_city := &City{}
+	c.Bind(new_city)
+
+	query := `
+insert into
+    city (Name, CountryCode, District, Population)
+values
+    (:Name, :CountryCode, :District, :Population)
+	`
+	if _, err := db.NamedExec(query, new_city); err != nil {
+		log.Fatalf("DB Error: %s", err)
+	}
+
+	return c.String(http.StatusOK, "")
+}
+
 func main() {
 	initDB()
 
@@ -109,6 +130,6 @@ func main() {
 	e.GET("/cities/:cityName", getCityInfoHandler)
 	e.GET("/cities/:cityName/population", getCityPopulationHandler)
 
+	e.POST("/cities", postCityHandler)
 	e.Start(":10101")
-
 }
