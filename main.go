@@ -5,29 +5,40 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
+
+	"github.com/labstack/echo/v4"
 )
 
 var (
 	db *sqlx.DB
 )
 
-type City struct {
-	ID          int    `json:"id,omitempty" db:"ID"`
-	Name        string `json:"name,omitempty" db:"Name"`
-	CountryCode string `json:"countryCode,omitempty" db:"CountryCode"`
-	District    string `json:"district,omitempty" db:"District"`
-	Population  int    `json:"population,omitempty" db:"Population"`
-}
+type (
+	City struct {
+		ID          int    `json:"id,omitempty" db:"ID"`
+		Name        string `json:"name,omitempty" db:"Name"`
+		CountryCode string `json:"countryCode,omitempty" db:"CountryCode"`
+		District    string `json:"district,omitempty" db:"District"`
+		Population  int    `json:"population,omitempty" db:"Population"`
+	}
 
-type CountryNamePop struct {
-	CountryCode string `json:"countryCode,omitempty" db:"CountryCode"`
-	Name        string `json:"name,omitempty" db:"Name"`
-	Population  int    `json:"population,omitempty" db:"Population"`
-}
+	CountryNamePop struct {
+		Code       string `json:"countryCode,omitempty" db:"Code"`
+		Name       string `json:"name,omitempty" db:"Name"`
+		Population int    `json:"population,omitempty" db:"Population"`
+	}
+
+	CityPopulationResponse struct {
+		Name       string
+		Population int
+		Ratio      float64
+	}
+)
 
 func initDB() {
 	var err error
@@ -57,7 +68,7 @@ func getCity(name string) City {
 
 func getCountryNamePop(code string) CountryNamePop {
 	var countryNamePop CountryNamePop
-	if err := db.Get(&countryNamePop, "select country.Name, country.Population where city.Code = ?", code); errors.Is(err, sql.ErrNoRows) {
+	if err := db.Get(&countryNamePop, "select Code, Name, Population from country where code = ?", code); errors.Is(err, sql.ErrNoRows) {
 		log.Printf("no such country Code %s\n", code)
 	} else if err != nil {
 		log.Fatalf("DB Error: %s", err)
@@ -66,13 +77,8 @@ func getCountryNamePop(code string) CountryNamePop {
 	return countryNamePop
 }
 
-func main() {
-	initDB()
-
-	target_city := "Tokyo"
-	if len(os.Args) >= 2 {
-		target_city = os.Args[1]
-	}
+func getCityPopulationHandler(c echo.Context) error {
+	target_city := c.Param("cityName")
 
 	city := getCity(target_city)
 	fmt.Printf("%sの人口は%d人です\n", target_city, city.Population)
@@ -81,4 +87,28 @@ func main() {
 
 	ratio := float64(city.Population) / float64(countryNamePop.Population)
 	fmt.Printf("%sの人口は%sの人口の%f%%です\n", target_city, countryNamePop.Name, ratio*100.0)
+	return c.JSON(http.StatusOK, CityPopulationResponse{
+		Name:       target_city,
+		Population: city.Population,
+		Ratio:      ratio,
+	})
+}
+
+func getCityInfoHandler(c echo.Context) error {
+	target_city := c.Param("cityName")
+
+	city := getCity(target_city)
+	return c.JSON(http.StatusOK, city)
+}
+
+func main() {
+	initDB()
+
+	e := echo.New()
+
+	e.GET("/cities/:cityName", getCityInfoHandler)
+	e.GET("/cities/:cityName/population", getCityPopulationHandler)
+
+	e.Start(":10101")
+
 }
