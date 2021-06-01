@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
 
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/session"
@@ -42,6 +43,24 @@ type (
 		Population  int    `json:"population,omitempty" db:"Population"`
 	}
 
+	Country struct {
+		Code           string          `db:"Code"`
+		Name           string          `db:"Name"`
+		Continent      string          `db:"Continent"`
+		Region         string          `db:"Region"`
+		SurfaceArea    float64         `db:"SurfaceArea"`
+		IndepYear      sql.NullInt32   `db:"IndepYear"`
+		Population     int             `db:"Population"`
+		LifeExpectancy sql.NullFloat64 `db:"LifeExpectancy"`
+		GNP            sql.NullFloat64 `db:"GNP"`
+		GNPOld         sql.NullFloat64 `db:"GNPOld"`
+		LocalName      string          `db:"LocalName"`
+		GovernmentForm string          `db:"GovernmentForm"`
+		HeadOfState    sql.NullString  `db:"HeadOfState"`
+		Capital        sql.NullInt32   `db:"Capital"`
+		Code2          string          `db:"Code2"`
+	}
+
 	CountryNamePop struct {
 		Code       string `json:"countryCode,omitempty" db:"Code"`
 		Name       string `json:"name,omitempty" db:"Name"`
@@ -56,6 +75,10 @@ type (
 
 	WhoAmIResponse struct {
 		Username string `json:"username,omitempty"  db:"username"`
+	}
+
+	CountryNameResponse struct {
+		Name string
 	}
 )
 
@@ -189,6 +212,18 @@ func getCity(name string) (*City, error) {
 	return city, nil
 }
 
+func getCountries() (*[]Country, error) {
+	countries := &[]Country{}
+	query := "select * from country"
+
+	if err := db.Select(countries, query); err != nil {
+		log.Fatalf("DB Error: %s", err)
+		return nil, err
+	}
+
+	return countries, nil
+}
+
 func getCountryNamePop(code string) CountryNamePop {
 	var countryNamePop CountryNamePop
 
@@ -263,6 +298,25 @@ func getWhoAmIHandler(c echo.Context) error {
 	})
 }
 
+func getCountriesHandler(c echo.Context) error {
+	countries, err := getCountries()
+	if err != nil {
+		log.Fatalf("DB Error: %s", err)
+	}
+
+	response := []CountryNameResponse{}
+	for _, country := range *countries {
+		response = append(response, CountryNameResponse{
+			Name: country.Name,
+		})
+	}
+
+	sort.SliceStable(response,
+		func(i, j int) bool { return response[i].Name < response[j].Name })
+
+	return c.JSON(http.StatusOK, response)
+}
+
 func main() {
 	db = initDB()
 	store := initSession()
@@ -282,6 +336,7 @@ func main() {
 
 	withLogin.GET("/cities/:cityName", getCityInfoHandler)
 	withLogin.GET("/whoami", getWhoAmIHandler)
+	withLogin.GET("/countries", getCountriesHandler)
 
 	e.Start(":10101")
 }
