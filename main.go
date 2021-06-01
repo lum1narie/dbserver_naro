@@ -80,6 +80,10 @@ type (
 	CountryNameResponse struct {
 		Name string
 	}
+
+	CityNameResponse struct {
+		Name string
+	}
 )
 
 func initDB() *sqlx.DB {
@@ -224,8 +228,23 @@ func getCountries() (*[]Country, error) {
 	return countries, nil
 }
 
+func getCountryByName(name string) (*Country, error) {
+	country := &Country{}
+	query := "select * from country where Name = ?"
+
+	if err := db.Get(country, query, name); errors.Is(err, sql.ErrNoRows) {
+		log.Printf("no country %s found \n", country.Name)
+		return nil, err
+	} else if err != nil {
+		log.Fatalf("DB Error: %s", err)
+		return nil, err
+	}
+
+	return country, nil
+}
+
 func getCountryNamePop(code string) CountryNamePop {
-	var countryNamePop CountryNamePop
+	countryNamePop := CountryNamePop{}
 
 	query := "select Code, Name, Population from country where code = ?"
 	if err := db.Get(
@@ -236,6 +255,21 @@ func getCountryNamePop(code string) CountryNamePop {
 	}
 
 	return countryNamePop
+}
+
+func getCitiesByCountry(country *Country) (*[]City, error) {
+	cities := &[]City{}
+
+	query := "select * from city where CountryCode = ?"
+	if err := db.Select(cities, query, country.Code); errors.Is(err, sql.ErrNoRows) {
+		log.Printf("no city found in country %s\n", country.Name)
+		return nil, err
+	} else if err != nil {
+		log.Fatalf("DB Error: %s", err)
+		return nil, err
+	}
+
+	return cities, nil
 }
 
 func getCityPopulationHandler(c echo.Context) error {
@@ -301,13 +335,50 @@ func getWhoAmIHandler(c echo.Context) error {
 func getCountriesHandler(c echo.Context) error {
 	countries, err := getCountries()
 	if err != nil {
-		log.Fatalf("DB Error: %s", err)
+		return c.String(http.StatusInternalServerError,
+			"something went wrong")
 	}
 
 	response := []CountryNameResponse{}
 	for _, country := range *countries {
 		response = append(response, CountryNameResponse{
 			Name: country.Name,
+		})
+	}
+
+	sort.SliceStable(response,
+		func(i, j int) bool { return response[i].Name < response[j].Name })
+
+	return c.JSON(http.StatusOK, response)
+}
+
+func getCountryCitiesHandler(c echo.Context) error {
+	countryName := c.Param("countryName")
+
+	country, err := getCountryByName(countryName)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return c.String(http.StatusBadRequest, "no cities found")
+		} else {
+			return c.String(http.StatusInternalServerError,
+				"something went wrong")
+		}
+	}
+
+	cities, err := getCitiesByCountry(country)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return c.String(http.StatusBadRequest, "no cities found")
+		} else {
+			return c.String(http.StatusInternalServerError,
+				"something went wrong")
+		}
+	}
+
+	response := []CityNameResponse{}
+	for _, city := range *cities {
+		response = append(response, CityNameResponse{
+			Name: city.Name,
 		})
 	}
 
@@ -337,6 +408,7 @@ func main() {
 	withLogin.GET("/cities/:cityName", getCityInfoHandler)
 	withLogin.GET("/whoami", getWhoAmIHandler)
 	withLogin.GET("/countries", getCountriesHandler)
+	withLogin.GET("/country/:countryName/cities", getCountryCitiesHandler)
 
 	e.Start(":10101")
 }
