@@ -53,6 +53,10 @@ type (
 		Population int
 		Ratio      float64
 	}
+
+	WhoAmIResponse struct {
+		Username string `json:"username,omitempty"  db:"username"`
+	}
 )
 
 func initDB() *sqlx.DB {
@@ -253,8 +257,10 @@ values
 }
 
 func getWhoAmIHandler(c echo.Context) error {
-	userName := c.Get("userName").(string)
-	return c.String(http.StatusOK, userName)
+	username := c.Get("userName").(string)
+	return c.JSON(http.StatusOK, WhoAmIResponse{
+		Username: username,
+	})
 }
 
 func main() {
