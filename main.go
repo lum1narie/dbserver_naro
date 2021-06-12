@@ -109,6 +109,24 @@ func initSession() sessions.Store {
 	return store
 }
 
+func checkLogin(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		sess, err := session.Get("sessions", c)
+		if err != nil {
+			fmt.Println(err)
+			return c.String(http.StatusInternalServerError,
+				"something wrong in getting session")
+		}
+
+		if sess.Values["userName"] == nil {
+			return c.String(http.StatusForbidden, "please login")
+		}
+		c.Set("userName", sess.Values["userName"].(string))
+
+		return next(c)
+	}
+}
+
 func postSignUpHandler(c echo.Context) error {
 	req := &LoginRequestBody{}
 	if err := c.Bind(req); err != nil {
@@ -183,22 +201,20 @@ func postLoginHandler(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
-func checkLogin(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		sess, err := session.Get("sessions", c)
-		if err != nil {
-			fmt.Println(err)
-			return c.String(http.StatusInternalServerError,
-				"something wrong in getting session")
-		}
-
-		if sess.Values["userName"] == nil {
-			return c.String(http.StatusForbidden, "please login")
-		}
-		c.Set("userName", sess.Values["userName"].(string))
-
-		return next(c)
+func postLogoffHandler(c echo.Context) error {
+	sess, err := session.Get("sessions", c)
+	if err != nil {
+		fmt.Println(err)
+		return c.String(http.StatusInternalServerError,
+			"something wrong in getting session")
 	}
+
+	if sess.Values["userName"] == nil {
+		return c.String(http.StatusForbidden, "please login")
+	}
+	c.Set("userName", sess.Values["userName"].(string))
+
+	return nil
 }
 
 func getCity(name string) (*City, error) {
@@ -410,5 +426,5 @@ func main() {
 	withLogin.GET("/countries", getCountriesHandler)
 	withLogin.GET("/country/:countryName/cities", getCountryCitiesHandler)
 
-	e.Start(":10101")
+	e.Start(os.Getenv("SERVER_PORT"))
 }
