@@ -1,0 +1,44 @@
+version: "3"
+services:
+  worldapp_user01:
+    build: ./
+    restart: always
+    environment:
+      DB_USERNAME: "user1"
+      DB_PASSWORD: "nDMnRRSB6BBXMpHr"
+      DB_HOSTNAME: "dbserver_user01"
+      DB_PORT: "3306"
+      DB_DATABASE: "world"
+      SERVER_PORT: ":3000"
+    depends_on:
+      - dbserver_user01
+
+  dbserver_user01:
+    restart: always
+    image: mariadb:latest
+    environment:
+      MYSQL_USER: "user1"
+      MYSQL_PASSWORD: "nDMnRRSB6BBXMpHr"
+      MYSQL_DATABASE: "world"
+      MYSQL_ROOT_PASSWORD: "nDMnRRSB6BBXMpHr"
+    volumes:
+      - type: bind
+        source: "./mysql"
+        target: "/var/lib/mysql"
+      - type: bind
+        source: "./initdb"
+        target: "/docker-entrypoint-initdb.d"
+
+  nginx_user01:
+    image: nginx
+    ports:
+      - "10100:80"
+    volumes:
+      - type: bind
+        source: "./nginx/conf.d"
+        target: "/etc/nginx/conf.d"
+    depends_on:
+      - worldapp_user01
+
+volumes:
+  dbvolume:
